@@ -27,7 +27,17 @@ const allowedOrigins = [
   'http://localhost:5173',
   'http://localhost:5174',
   'http://127.0.0.1:5173',
-  'http://127.0.0.1:5174'
+  'http://127.0.0.1:5174',
+  'https://interactive-quiz-app-1-x1v5.onrender.com'
+]
+const baseURL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+
+// Log API configuration for debugging
+console.log('🔧 API Configuration:', {
+  baseURL,
+  fullAPIBase: baseURL + '/api',
+  envVar: import.meta.env.VITE_API_URL || 'not set (using default)'
+});
 ];
 
 // Add production frontend URL from environment

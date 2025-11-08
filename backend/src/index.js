@@ -43,7 +43,6 @@ console.log('🔧 API Configuration:', {
   fullAPIBase: baseURL + '/api',
   envVar: import.meta.env.VITE_API_URL || 'not set (using default)'
 });
-];
 
 // Add production frontend URL from environment
 if (process.env.CORS_ORIGIN) {

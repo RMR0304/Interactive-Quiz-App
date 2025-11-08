@@ -1,6 +1,10 @@
 import axios from 'axios';
 
-const baseURL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+const baseURL =
+  import.meta.env.VITE_API_URL ||
+  (window.location.hostname.includes('localhost')
+    ? 'http://localhost:5000'
+    : 'https://interactive-quiz-application-zupt.onrender.com');
 
 // Log API configuration for debugging
 console.log('🔧 API Configuration:', {

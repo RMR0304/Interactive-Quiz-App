@@ -31,19 +31,6 @@ export const allowedOrigins = [
   'https://interactive-quiz-app-1-x1v5.onrender.com' 
 ];
   
-const baseURL =
-  import.meta.env.VITE_API_URL ||
-  (window.location.hostname.includes('localhost')
-    ? 'http://localhost:5000'
-    : 'https://interactive-quiz-application-zupt.onrender.com');
-
-// Log API configuration for debugging
-console.log('🔧 API Configuration:', {
-  baseURL,
-  fullAPIBase: baseURL + '/api',
-  envVar: import.meta.env.VITE_API_URL || 'not set (using default)'
-});
-
 // Add production frontend URL from environment
 if (process.env.CORS_ORIGIN) {
   allowedOrigins.push(process.env.CORS_ORIGIN);

@@ -23,14 +23,19 @@ app.use(morgan('dev'));
 
 // CORS configuration - allow frontend to connect
 // In development, allow both localhost:5173 and localhost:5174 (Vite may use different port)
-const allowedOrigins = [
+export const allowedOrigins = [
   'http://localhost:5173',
   'http://localhost:5174',
   'http://127.0.0.1:5173',
   'http://127.0.0.1:5174',
-  'https://interactive-quiz-app-1-x1v5.onrender.com'
-]
-const baseURL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+  'https://interactive-quiz-app-1-x1v5.onrender.com' 
+];
+  
+const baseURL =
+  import.meta.env.VITE_API_URL ||
+  (window.location.hostname.includes('localhost')
+    ? 'http://localhost:5000'
+    : 'https://interactive-quiz-application-zupt.onrender.com');
 
 // Log API configuration for debugging
 console.log('🔧 API Configuration:', {

@@ -1,7 +1,12 @@
+// index.js
 import express from 'express';
 import dotenv from 'dotenv';
 import cors from 'cors';
 import morgan from 'morgan';
+import helmet from 'helmet';
+import compression from 'compression';
+import rateLimit from 'express-rate-limit';
+import http from 'http';
 import { connectDB } from './config/db.js';
 import authRoutes from './routes/auth.js';
 import quizRoutes from './routes/quizzes.js';
@@ -17,47 +22,65 @@ dotenv.config();
 
 const app = express();
 
-// Middleware
-app.use(express.json());
-app.use(morgan('dev'));
+// Security & performance middlewares
+app.use(helmet());
+app.use(compression());
+
+// Logging
+if (process.env.NODE_ENV !== 'test') {
+  app.use(morgan('dev'));
+}
+
+// Body parser
+app.use(express.json({ limit: '10kb' })); // limit to avoid huge payloads
+
+// Rate limiter (basic)
+const apiLimiter = rateLimit({
+  windowMs: 60 * 1000, // 1 minute
+  max: 120, // max requests per window per IP
+  standardHeaders: true,
+  legacyHeaders: false
+});
+app.use('/api/', apiLimiter);
 
 // CORS configuration - allow frontend to connect
-// In development, allow both localhost:5173 and localhost:5174 (Vite may use different port)
-export const allowedOrigins = [
+const allowedOrigins = new Set([
   'http://localhost:5173',
   'http://localhost:5174',
   'http://127.0.0.1:5173',
   'http://127.0.0.1:5174',
-  'https://interactive-quiz-app-1-x1v5.onrender.com' 
-];
-  
+  'https://interactive-quiz-app-1-x1v5.onrender.com',
+  'https://interactive-quiz-application-zupt.onrender.com' // added from your logs
+]);
+
 // Add production frontend URL from environment
 if (process.env.CORS_ORIGIN) {
-  allowedOrigins.push(process.env.CORS_ORIGIN);
+  allowedOrigins.add(process.env.CORS_ORIGIN);
 }
 
 app.use(
   cors({
     origin: function (origin, callback) {
-      // Allow requests with no origin (mobile apps, Postman, etc.)
+      // Allow requests with no origin (mobile apps, Postman, server-to-server)
       if (!origin) return callback(null, true);
-      
-      // In production, only allow whitelisted origins
+
+      // In production, enforce whitelist
       if (process.env.NODE_ENV === 'production') {
-        if (allowedOrigins.indexOf(origin) !== -1) {
-          callback(null, true);
+        if (allowedOrigins.has(origin)) {
+          return callback(null, true);
         } else {
-          console.log('⚠️ CORS blocked origin:', origin);
-          callback(new Error('Not allowed by CORS'));
+          console.warn('⚠️ CORS blocked origin:', origin);
+          return callback(new Error('Not allowed by CORS'));
         }
+      }
+
+      // In non-production, allow origins in the whitelist or allow all (for debugging)
+      if (allowedOrigins.has(origin)) {
+        return callback(null, true);
       } else {
-        // In development, allow all for debugging
-        if (allowedOrigins.indexOf(origin) !== -1 || process.env.CORS_ORIGIN === origin) {
-          callback(null, true);
-        } else {
-          console.log('⚠️ CORS blocked origin:', origin);
-          callback(null, true); // Allow for debugging
-        }
+        // Log a warning but allow — this mirrors your previous intent to be permissive in dev.
+        console.warn('⚠️ CORS origin not in whitelist (dev):', origin);
+        return callback(null, true);
       }
     },
     credentials: true,
@@ -66,11 +89,12 @@ app.use(
   })
 );
 
-// Routes
+// Simple health endpoint
 app.get('/api/health', (req, res) => {
-  res.json({ status: 'ok' });
+  res.json({ status: 'ok', env: process.env.NODE_ENV || 'development' });
 });
 
+// Routes
 app.use('/api/auth', authRoutes);
 app.use('/api/quizzes', quizRoutes);
 app.use('/api/results', resultRoutes);
@@ -84,21 +108,29 @@ app.use('/api/teacher', teacherRoutes);
 // Global error handler
 // eslint-disable-next-line no-unused-vars
 app.use((err, req, res, next) => {
-  console.error(err);
-  const status = err.status || 500;
+  console.error('Global error handler caught:', err && err.stack ? err.stack : err);
+  const status = err && err.status ? err.status : 500;
   res.status(status).json({
-    message: err.message || 'Internal Server Error'
+    message: (err && err.message) || 'Internal Server Error'
   });
 });
 
 // Start server only when not in test
-const PORT = process.env.PORT || 5000;
+const PORT = Number(process.env.PORT) || 5000;
+let server;
 
 if (process.env.NODE_ENV !== 'test') {
   connectDB()
     .then(() => {
-      app.listen(PORT, () => {
-        console.log(`Server running on port ${PORT}`);
+      server = http.createServer(app);
+
+      // Increase server timeouts to avoid short client-side timeouts causing aborted connections.
+      // Many client libraries time out at 10s by default; raising server timeout prevents premature disconnects.
+      server.setTimeout(120000); // 120s
+      server.keepAliveTimeout = 65000; // 65s (Node default is 5s in some versions)
+
+      server.listen(PORT, () => {
+        console.log(`Server running on port ${PORT} (env: ${process.env.NODE_ENV || 'development'})`);
       });
     })
     .catch((err) => {
@@ -107,7 +139,15 @@ if (process.env.NODE_ENV !== 'test') {
     });
 }
 
+// Graceful process handlers
+process.on('unhandledRejection', (reason, promise) => {
+  console.error('Unhandled Rejection at:', promise, 'reason:', reason);
+  // optional: close server & exit if you want to fail fast in production
+});
+
+process.on('uncaughtException', (err) => {
+  console.error('Uncaught Exception thrown:', err);
+  // optional: close server & exit in production
+});
+
 export default app;
-
-
-
